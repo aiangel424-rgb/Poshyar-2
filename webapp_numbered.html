@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>پوش‌یار AI — ماسک لباس</title>
+<style>
+body{margin:0;background:#101820;color:#edf4f6;font:16px Tahoma,Arial;line-height:1.8}main{max-width:900px;margin:auto;padding:16px}
+.card{background:#192832;border:1px solid #3a4d59;border-radius:16px;padding:16px;margin:14px 0}
+input,button{font:inherit;width:100%;padding:12px;margin:6px 0;border-radius:9px;border:1px solid #536775;background:#101a22;color:white}
+button{background:#35465d;cursor:pointer}img,canvas{max-width:100%;height:auto;background:#050505;border-radius:8px}
+.num{color:#ffe95b;font-weight:bold}.warn{color:#ffb9a6}
+</style><main><h1>پوش‌یار AI — ساخت ماسک لباس</h1>
+<section class="card"><h2>راهنمای شماره‌ها</h2>
+<p><b class="num">[۱]</b> آدرس پایهٔ سرویس؛ بعد از Deploy از صفحهٔ سرویس کپی شود.</p>
+<p><b class="num">[۲]</b> آدرس endpoint؛ آدرس پایه به‌علاوهٔ <code>/segment</code>.</p>
+<p><b class="num">[۳]</b> توکن؛ در این نسخه خالی بماند.</p>
+<p><b class="num">[۴]</b> خروجی PNG: سفید=لباس، سیاه=ناحیهٔ محافظت‌شده.</p>
+<p><b class="num">[۵]</b> endpoint تعویض لباس هنوز آماده نیست.</p><p><b class="num">[۶]</b> کلید API تعویض لباس را فعلاً وارد نکنید.</p></section>
+<section class="card"><h2>۱. انتخاب تصویر</h2><input id="file" type="file" accept="image/*"><p id="status">عکس انتخاب کنید؛ پیش‌نمایش تا زمان تشخیص روی گوشی می‌ماند.</p><img id="preview" hidden><h3>ماسک</h3><canvas id="mask" width="1" height="1"></canvas><button id="download" disabled>دانلود ماسک PNG</button></section>
+<section class="card"><h2>۲. اتصال تشخیص خودکار</h2>
+<label><b class="num">[۱]</b> آدرس پایه</label><input id="base" placeholder="https://YOUR-USER-poshyar-segment.hf.space">
+<label><b class="num">[۲]</b> آدرس endpoint تشخیص</label><input id="endpoint" placeholder="https://YOUR-USER-poshyar-segment.hf.space/segment">
+<label><b class="num">[۳]</b> توکن (خالی بگذارید)</label><input id="token" type="password" placeholder="اختیاری">
+<button id="health">بررسی اتصال</button><button id="run">تشخیص خودکار لباس</button>
+<p class="warn">هنگام تشخیص، عکس به آدرس سرویس واردشده ارسال می‌شود. فقط به سرویس مورداعتماد ارسال کنید.</p></section>
+<section class="card"><h2>۳. تعویض لباس — مرحله بعد</h2><p><b class="num">[۵]</b> آدرس endpoint ویرایش تصویر: هنوز متصل نشده.</p><p><b class="num">[۶]</b> کلید API ویرایش تصویر: وارد نکنید؛ کلید محرمانه نباید در مرورگر عمومی ذخیره شود.</p></section>
+<script>
+const f=document.querySelector('#file'),img=document.querySelector('#preview'),c=document.querySelector('#mask'),ctx=c.getContext('2d');let file=null;
+const status=document.querySelector('#status'),say=s=>status.textContent=s;
+f.onchange=()=>{file=f.files[0];if(!file)return;img.onload=()=>{img.hidden=false;c.width=img.naturalWidth;c.height=img.naturalHeight;ctx.fillStyle='black';ctx.fillRect(0,0,c.width,c.height);document.querySelector('#download').disabled=false;say('تصویر آماده است؛ هنوز به سرور ارسال نشده.')};img.src=URL.createObjectURL(file)};
+document.querySelector('#health').onclick=async()=>{let b=document.querySelector('#base').value.trim().replace(/\/+$/,'');if(!b)b=document.querySelector('#endpoint').value.trim().replace(/\/segment\/?$/,'');if(!b)return say('آدرس [۱] یا [۲] را وارد کنید.');try{let r=await fetch(b+'/health');if(!r.ok)throw Error('HTTP '+r.status);say('اتصال برقرار است: '+JSON.stringify(await r.json()))}catch(e){say('اتصال ناموفق: '+e.message)}};
+document.querySelector('#run').onclick=async()=>{if(!file)return say('ابتدا عکس انتخاب کنید.');let ep=document.querySelector('#endpoint').value.trim();if(!ep)return say('آدرس [۲] را وارد کنید.');let fd=new FormData();fd.append('image',file,file.name);fd.append('format','binary-mask-png');let headers={};let t=document.querySelector('#token').value.trim();if(t)headers.Authorization='Bearer '+t;say('در حال تشخیص... عکس به سرور ارسال می‌شود.');try{let r=await fetch(ep,{method:'POST',body:fd,headers});if(!r.ok)throw Error('HTTP '+r.status);let bitmap=await createImageBitmap(await r.blob());if(bitmap.width!==c.width||bitmap.height!==c.height)throw Error('ابعاد ماسک با تصویر یکسان نیست');ctx.drawImage(bitmap,0,0);let d=ctx.getImageData(0,0,c.width,c.height);for(let i=0;i<d.data.length;i+=4){let v=d.data[i]>=128?255:0;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255}ctx.putImageData(d,0,0);say('ماسک دریافت شد. [۴] سفید=لباس، سیاه=محافظت‌شده؛ نتیجه را بررسی کنید.')}catch(e){say('تشخیص ناموفق: '+e.message+'؛ آدرس و وضعیت سرویس را بررسی کنید.')}};
+document.querySelector('#download').onclick=()=>c.toBlob(b=>{let a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='poshyar-mask.png';a.click();URL.revokeObjectURL(a.href)},'image/png');
+</script></main></html>
